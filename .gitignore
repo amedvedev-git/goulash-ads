@@ -1,0 +1,12 @@
+output/
+tmp/
+node_modules/
+.env
+.env.*
+*.sqlite*
+*.db
+*.log
+*.pem
+*.key
+*.dpapi
+*.tar.gz

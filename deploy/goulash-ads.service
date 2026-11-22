@@ -1,0 +1,25 @@
+[Unit]
+Description=Goulash Ads staging application
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+DynamicUser=yes
+StateDirectory=goulash-ads
+StateDirectoryMode=0700
+WorkingDirectory=/opt/goulash-ads/app
+Environment=GOULASH_BIND=172.18.0.1 GOULASH_PORT=8767 GOULASH_PUBLIC_ORIGIN=https://ads.example.org
+Environment=GOULASH_DATA_DIR=/var/lib/goulash-ads
+LoadCredential=yandex_client_id:/etc/goulash-ads/yandex_client_id
+LoadCredential=yandex_client_secret:/etc/goulash-ads/yandex_client_secret
+ExecStart=/opt/goulash-ads/bin/node /opt/goulash-ads/app/src/server.ts
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

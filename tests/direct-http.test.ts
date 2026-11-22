@@ -1,0 +1,77 @@
+import { confirmedPlan } from './fixtures/confirmed-plan.ts';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { once } from 'node:events';
+import { openDatabase } from '../src/database.ts';
+import { createApp } from '../src/server.ts';
+import { fakeDirect } from './fixtures/direct-api.ts';
+import { exampleCampaign } from '../src/campaign.ts';
+import { createYandexAuth } from '../src/yandex-auth.ts';
+import { createHash } from 'node:crypto';
+import { createDirectService } from '../src/direct.ts';
+
+test('Direct HTTP: подтверждение, история, XSS, CSRF, двойной submit, конфликт и сохранность редактора', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'direct-http-')), db = openDatabase(dir), fake = fakeDirect();
+  const server = createApp(db, undefined, undefined, undefined, { api: fake.api, owner: 'local', account: '31001001', mode: 'fixture' });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  t.after(async () => { await new Promise<void>(r => server.close(() => r())); db.close(); rmSync(dir, { recursive: true }); });
+  const address = server.address(); assert.ok(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
+  const post = (path: string, values: Record<string, string>, site = origin) => fetch(origin + path, { method: 'POST', headers: { Origin: site }, body: new URLSearchParams(values), redirect: 'manual' });
+  const page = async (path = '/campaign?ad=default') => (await fetch(origin + path)).text();
+  assert.equal((await post('/campaign/save', { ...exampleCampaign, title: 'Заголовок вручную', adText: 'Текст вручную', revision: '0' })).status, 303);
+  const campaignPlanId = confirmedPlan(db, db.readCampaign('local')!.draft, ['доставка роллов']);
+  assert.equal((await post('/direct/prepare', { name: 'Тест', weekly: '300', campaignPlanId, revision: '1' })).status, 303);
+  assert.equal((await post('/direct/suggest', { revision: '1', offer: 'доставка роллов' })).status, 409);
+  const invalid = await post('/direct/prepare', { name: 'Сохранить это имя', weekly: '2', campaignPlanId, phrasePlanId: db.readPhrasePlan('local')!.id, selected: 'доставка роллов', revision: '1' });
+  assert.equal(invalid.status, 409);
+  const invalidHtml = await invalid.text();
+  assert.match(invalidHtml, /Недельный бюджет|бюджет/i);
+  const form = { planId: db.readDirect('local')!.planId, confirm: 'yes' };
+  assert.equal((await post('/direct/create', { ...form, confirm: '' })).status, 409); assert.equal(fake.writes().length, 0);
+  assert.equal((await post('/direct/create', form, 'https://foreign.test')).status, 403); assert.equal(fake.writes().length, 0);
+  assert.equal((await post('/direct/create', form)).status, 303);
+  assert.equal((await post('/direct/create', form)).status, 303);
+  assert.equal(fake.records.campaigns.length, 1);
+  const html = await page();
+  assert.match(html, /Показы выключены/); assert.match(html, /9000123400000000123/); assert.doesNotMatch(html, /fixture-token/);
+  assert.match(html, /Учебные данные/); assert.match(html, /без НДС на неделю/);
+  const planEditor = await page('/campaigns?ad=default&edit=1');
+  assert.match(planEditor, /Лимит плана .* остаётся в Goulash\. В Директ передаётся недельный бюджет/);
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]); assert.equal(new Set(ids).size, ids.length);
+  const before = db.readDirect('local')!.name;
+  assert.equal((await post('/direct/rename', { ...form, before, name: '<img src=x onerror=alert(1)>' })).status, 303);
+  const history = await page('/history'); assert.match(history, /&lt;img src=x/); assert.doesNotMatch(history, /<img src=x/);
+  const id = db.readDirect('local')!.events.at(-1)!.id;
+  assert.equal((await post('/direct/undo', { ...form, id })).status, 303);
+  assert.equal(fake.records.campaigns[0].Name, before);
+  assert.equal(db.readCampaign('local')?.draft.title, 'Заголовок вручную');
+  fake.records.campaigns[0].Name = 'Изменено снаружи';
+  assert.equal((await post('/direct/rename', { ...form, before, name: 'Новая попытка' })).status, 409);
+  assert.match(await page('/history'), /Конфликт/); assert.equal(fake.records.campaigns[0].Name, 'Изменено снаружи');
+});
+
+test('Direct HTTP: неподключённый владелец не видит привязку и не выполняет API; публичный DPAPI запрещён', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'direct-owner-')), db = openDatabase(dir), fake = fakeDirect();
+  const connection = { api: fake.api, owner: 'yandex:owner', account: '31001001', mode: 'fixture' as const };
+  assert.throws(() => createApp(db, undefined, new URL('https://example.com'), undefined, connection), /публичном/);
+  db.saveCampaign('yandex:owner', { ...exampleCampaign, title: 'Личное объявление', adText: 'Текст владельца' }, 0, 'Владелец');
+  const campaignPlanId = confirmedPlan(db, db.readCampaign('yandex:owner')!.draft, ['роллы'], 'yandex:owner');
+  const service = createDirectService(db, connection);
+  await service.action('yandex:owner', 'prepare', new URLSearchParams({ revision: '1', campaignPlanId, name: 'Личная кампания', weekly: '300', keyword: 'роллы' }), 'Владелец');
+  const auth = createYandexAuth(db, 'test-client', 'test-secret');
+  const token = 'a'.repeat(43);
+  db.createSession(createHash('sha256').update(`test-client:${token}`).digest('hex'), 'yandex:other', 'Другой', Date.now() + 60000);
+  const server = createApp(db, auth, undefined, undefined, connection); server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  t.after(async () => { await new Promise<void>(r => server.close(() => r())); db.close(); rmSync(dir, { recursive: true }); });
+  const address = server.address(); assert.ok(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
+  const calls = fake.calls.length;
+  for (const action of ['prepare', 'create', 'refresh', 'rename', 'undo']) {
+    const response = await fetch(origin + '/direct/' + action, { method: 'POST', headers: { Origin: origin, Cookie: `goulash_session=${token}` }, body: new URLSearchParams({ planId: db.readDirect('yandex:owner')!.planId, confirm: 'yes' }) });
+    assert.equal(response.status, 403);
+  }
+  assert.equal(fake.calls.length, calls);
+  assert.doesNotMatch(await (await fetch(origin, { headers: { Cookie: `goulash_session=${token}` } })).text(), /Черновик в Директе|Личная кампания|Личное объявление/);
+});

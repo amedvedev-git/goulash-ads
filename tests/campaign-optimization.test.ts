@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { createAnalyticsService } from '../src/analytics.ts';
+import { createCampaignOptimization } from '../src/campaign-optimization.ts';
+import { pilotBrowser } from './fixtures/pilot-browser.ts';
+
+test('оценка кампании включается отдельно от показов, журналирует причину ожидания и не повторяет одинаковый вывод', async t => {
+  const folder = mkdtempSync(join(tmpdir(), 'goulash-run-assessment-'));
+  const x = await pilotBrowser(folder);
+  t.after(() => { x.db.close(); rmSync(folder, { recursive: true, force: true }); });
+  const analytics = createAnalyticsService(x.db, owner => x.manager.resolve(owner));
+  const optimization = createCampaignOptimization(x.db, analytics, owner => x.manager.resolve(owner));
+  const read = () => x.db.readCampaignDirectRuns(x.owner, x.workspace).at(-1)!;
+  const form = (enabled: string) => new URLSearchParams({ enabled, run: read().planId, revision: String(read().storageRevision) });
+  assert.throws(() => optimization.set('yandex:other', x.workspace, form('yes'), 'Другой владелец'), /Кампания изменилась/);
+  const before = x.a.writes().length;
+  optimization.set(x.owner, x.workspace, form('yes'), 'Владелец');
+  optimization.tick();
+  optimization.tick();
+  assert.deepEqual(read().optimization?.decisions.map(entry => entry.kind), ['enabled', 'waiting']);
+  assert.match(read().optimization?.decisions[1].reason ?? '', /не подтвердил активное состояние/);
+  optimization.set(x.owner, x.workspace, form('no'), 'Владелец');
+  optimization.tick();
+  assert.equal(read().optimization?.enabled, false);
+  assert.deepEqual(read().optimization?.decisions.map(entry => entry.kind), ['enabled', 'waiting', 'disabled']);
+  assert.equal(x.a.writes().length, before);
+});

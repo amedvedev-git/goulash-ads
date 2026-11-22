@@ -1,0 +1,22 @@
+# One final drop-in only: /etc/systemd/system/goulash-ads.service.d/runtime.conf.
+# Base unit retains Yandex ID login credentials. Credential source files: root-only0600.
+# Direct-only: keep the next three lines and --connect-direct; omit all other optional credentials/flags.
+[Service]
+LoadCredential=yandex_direct_client_id:/etc/goulash-ads/yandex_direct_client_id
+LoadCredential=yandex_direct_client_secret:/etc/goulash-ads/yandex_direct_client_secret
+LoadCredential=direct_token_key:/etc/goulash-ads/direct_token_key
+# Add these ONLY after preparing the corresponding files; research starts administratively off.
+# LoadCredential=wordstat_api_key:/etc/goulash-ads/wordstat_api_key
+# LoadCredential=phrase_ai_key:/etc/goulash-ads/phrase_ai_key
+# Environment=GOULASH_RESEARCH_ENABLED=0 GOULASH_RESEARCH_OWNER=yandex:REPLACE GOULASH_RESEARCH_CONFIG_VERSION=1 GOULASH_WORDSTAT_FOLDER=REPLACE
+# LoadCredential=metrika_token:/etc/goulash-ads/metrika_token
+# Environment=GOULASH_METRIKA_OWNER=yandex:REPLACE GOULASH_METRIKA_CONFIG_VERSION=1
+# Optional separate OAuth app for owners to connect Metrika with --connect-metrika.
+# LoadCredential=yandex_metrika_client_id:/etc/goulash-ads/yandex_metrika_client_id
+# LoadCredential=yandex_metrika_client_secret:/etc/goulash-ads/yandex_metrika_client_secret
+# LoadCredential=metrika_oauth_key:/etc/goulash-ads/metrika_oauth_key
+# Optional approval for one verified Search campaign and period.
+# LoadCredential=direct_launch_approval:/etc/goulash-ads/direct_launch_approval
+ExecStart=
+ExecStart=/opt/goulash-ads/bin/node /opt/goulash-ads/app/src/server.ts --connect-direct
+# Append --wordstat --phrase-ai, --metrika-read or --connect-metrika here once configured.

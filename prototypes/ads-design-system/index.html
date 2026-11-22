@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Дизайн-система рекламного кабинета · Goulash</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="preview.css">
+  <script src="preview.js" defer></script>
+</head>
+<body id="top">
+  <a class="skip" href="#main">Перейти к содержанию</a>
+  <header class="cover">
+    <div class="container cover-nav">
+      <a href="#top" class="brand"><span class="mark" aria-hidden="true"></span>Goulash<span class="brand-suffix">.tech</span></a>
+      <nav class="guide-nav" aria-label="Разделы дизайн-системы">
+        <a href="#patterns">Сценарии</a>
+        <a href="#components">Компоненты</a>
+        <a href="#tokens">Токены</a>
+      </nav>
+    </div>
+    <div class="container cover-grid">
+      <div>
+        <h1>Дизайн-система<br>рекламного кабинета</h1>
+        <p>Помогает владельцу ресторана подготовить кампанию, понять её результат и проверить действия Goulash.</p>
+        <a class="button button-primary" href="#patterns">Посмотреть кабинет <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="signal">
+        <p class="signal-title">Заявки по дням</p>
+        <p class="signal-value">24 <span>за неделю</span></p>
+        <div class="signal-bars" aria-hidden="true">
+          <span style="--size:2"></span><span style="--size:4"></span><span style="--size:4"></span><span style="--size:6"></span><span style="--size:2"></span><span style="--size:5"></span><span style="--size:1"></span>
+        </div>
+        <p class="signal-source"><span>Учебные данные</span><span>12–18 ноября · МСК</span></p>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1" class="container guide">
+    <section id="patterns" class="guide-section" aria-labelledby="patterns-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="patterns-title">Кабинет в работе</h2>
+          <p>Четыре раздела на примере кампании доставки пиццы.</p>
+        </div>
+        <span class="status status-neutral">Вымышленные данные</span>
+      </div>
+      <div class="app">
+        <div class="app-header">
+          <span class="app-brand"><span class="mark" aria-hidden="true"></span>Моя реклама</span>
+          <nav class="app-nav" aria-label="Демонстрация кабинета">
+            <button type="button" data-view="overview" aria-pressed="false" aria-controls="overview">Обзор</button>
+            <button type="button" data-view="campaigns" aria-pressed="false" aria-controls="campaigns">Кампании</button>
+            <button type="button" data-view="results" aria-pressed="true" aria-controls="results">Результаты</button>
+            <button type="button" data-view="history" aria-pressed="false" aria-controls="history">История</button>
+          </nav>
+        </div>
+        <div class="app-content">
+          <section class="screen" id="overview" aria-labelledby="overview-title" hidden>
+            <div class="screen-head">
+              <div><h3 id="overview-title" tabindex="-1">Обзор</h3><p class="muted">Реклама ресторана за последние 7 дней</p></div>
+              <button type="button" class="button button-secondary" data-open-view="campaigns">К списку кампаний</button>
+            </div>
+            <article class="panel">
+              <div class="row-between"><h4>Доставка пиццы</h4><span class="status status-ok">Показывается</span></div>
+              <dl class="metrics metrics-inset">
+                <div><dt>Расход</dt><dd>12&#8239;480&nbsp;₽</dd><dd class="metric-source">Яндекс Директ</dd></div>
+                <div><dt>Заявки</dt><dd>24</dd><dd class="metric-source">Яндекс Метрика</dd></div>
+                <div><dt>Стоимость заявки</dt><dd>519&nbsp;₽</dd><dd class="metric-source">Яндекс Метрика</dd></div>
+              </dl>
+              <button type="button" class="button button-primary" data-open-view="results">Посмотреть результаты</button>
+            </article>
+          </section>
+
+          <section class="screen" id="campaigns" aria-labelledby="campaigns-title" hidden>
+            <div class="screen-head">
+              <div><h3 id="campaigns-title" tabindex="-1">Кампании</h3><p class="muted">Бюджет и результаты по каждой кампании</p></div>
+              <a class="button button-primary" href="#budget-example">Настроить бюджет</a>
+            </div>
+            <div class="panel campaign-list">
+              <article class="campaign-row">
+                <div><h4>Доставка пиццы</h4><p class="muted">Калуга и ближайшие районы</p></div>
+                <span class="status status-ok">Показывается</span>
+                <dl><dt>Бюджет на неделю</dt><dd id="campaign-budget">15&#8239;000&nbsp;₽</dd></dl>
+                <button type="button" class="text-button" data-open-view="results">К результатам</button>
+              </article>
+              <article class="campaign-row">
+                <div><h4>Обеды по будням</h4><p class="muted">Калуга</p></div>
+                <span class="status status-neutral">Черновик</span>
+                <dl><dt>Бюджет на неделю</dt><dd>—</dd></dl>
+                <a href="#budget-example">Указать бюджет</a>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen" id="results" aria-labelledby="results-title">
+            <div class="screen-head">
+              <div><h3 id="results-title" tabindex="-1">Результаты</h3><p class="muted">Доставка пиццы · Цель «Заявка на сайте»</p></div>
+              <fieldset class="segmented">
+                <legend class="sr-only">Период результатов</legend>
+                <label><input type="radio" name="period" value="7" checked><span>7 дней</span></label>
+                <label><input type="radio" name="period" value="30"><span>30 дней</span></label>
+              </fieldset>
+            </div>
+            <div class="panel report">
+              <dl class="metrics">
+                <div><dt>Расход</dt><dd id="report-spend">12&#8239;480&nbsp;₽</dd><dd class="metric-source">Яндекс Директ</dd></div>
+                <div><dt>Заявки</dt><dd id="report-count">24</dd><dd class="metric-source">Яндекс Метрика</dd></div>
+                <div><dt>Стоимость заявки</dt><dd id="report-cost">519&nbsp;₽</dd><dd class="metric-source">Яндекс Метрика</dd></div>
+              </dl>
+              <section class="chart-panel" aria-labelledby="chart-title">
+                <div class="row-between chart-head">
+                  <h4 id="chart-title">Заявки по дням</h4>
+                  <p class="muted" id="report-period">12–18 ноября · МСК</p>
+                </div>
+                <div class="chart" aria-hidden="true">
+                  <div class="chart-scale" id="chart-scale"></div>
+                  <div class="chart-columns" id="chart-columns"></div>
+                </div>
+                <details>
+                  <summary>Таблица по дням</summary>
+                  <table>
+                    <caption class="sr-only" id="report-caption">Заявки по дням за 12–18 ноября</caption>
+                    <thead><tr><th scope="col">Дата</th><th scope="col">Заявки</th></tr></thead>
+                    <tbody id="report-days"></tbody>
+                  </table>
+                </details>
+                <details>
+                  <summary>Откуда данные</summary>
+                  <p class="muted">В рабочем кабинете расход берётся из Директа. Заявки и стоимость заявки — из отчёта Метрики по кампании. «Заявки» — число срабатываний выбранной цели.</p>
+                </details>
+              </section>
+            </div>
+            <p class="sr-only" id="report-update" role="status"></p>
+          </section>
+
+          <section class="screen" id="history" aria-labelledby="history-title" hidden>
+            <div class="screen-head"><div><h3 id="history-title" tabindex="-1">История</h3><p class="muted">Изменения кампании и решения Goulash</p></div></div>
+            <article class="panel event">
+              <div class="row-between"><h4>Изменён бюджет кампании</h4><time datetime="2026-11-18T14:20:00+03:00" class="muted">18 ноября · 14:20 МСК</time></div>
+              <p class="event-note"><span class="status status-info">Учебное решение Goulash</span><span>Доставка пиццы</span></p>
+              <p>Лимит увеличен после подтверждения владельцем.</p>
+              <dl class="change">
+                <div><dt>Было</dt><dd>13&#8239;000&nbsp;₽ в неделю</dd></div>
+                <div><dt>Стало</dt><dd>15&#8239;000&nbsp;₽ в неделю</dd></div>
+              </dl>
+              <details id="undo-review">
+                <summary>Посмотреть отмену</summary>
+                <div class="notice notice-warn">
+                  <p>Недельный лимит вернётся к 13&#8239;000&nbsp;₽. Уже потраченные средства останутся в отчёте.</p>
+                  <button type="button" class="button button-danger" id="undo-confirm">Подтвердить учебную отмену</button>
+                </div>
+              </details>
+              <p class="notice notice-ok" id="undo-result" role="status" tabindex="-1" hidden>Изменение отменено. Лимит снова 13&#8239;000&nbsp;₽ в неделю.</p>
+            </article>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="components" class="guide-section" aria-labelledby="components-title">
+      <div class="section-heading"><h2 id="components-title">Компоненты</h2></div>
+      <div class="spec-grid">
+        <article class="panel specimen">
+          <h3>Действия</h3>
+          <p class="muted">Одна бирюзовая кнопка выделяет следующее действие.</p>
+          <div class="action-samples">
+            <a class="button button-primary" href="#budget-example">Указать бюджет</a>
+            <button type="button" class="button button-secondary" data-open-view="campaigns">К кампаниям</button>
+            <button type="button" class="button" disabled>Сохраняем…</button>
+          </div>
+        </article>
+        <article class="panel specimen">
+          <h3>Статусы</h3>
+          <p class="muted">Текст объясняет состояние. Цвет помогает найти его в списке.</p>
+          <div class="status-samples">
+            <span class="status status-neutral">Черновик</span>
+            <span class="status status-ok">Показывается</span>
+            <span class="status status-warn">Остановлена</span>
+            <span class="status status-danger">Проверьте подключение</span>
+          </div>
+        </article>
+        <article class="panel specimen" id="budget-example">
+          <h3>Поле и проверка</h3>
+          <form id="budget-form" novalidate>
+            <label for="budget">Недельный лимит, ₽</label>
+            <p class="muted" id="budget-hint">Введите целую сумму от 1&#8239;000&nbsp;₽.</p>
+            <div class="form-row">
+              <input id="budget" name="budget" inputmode="numeric" required aria-describedby="budget-hint" placeholder="15 000">
+              <button class="button button-secondary" type="submit">Проверить</button>
+            </div>
+            <p class="error-text" id="budget-error" hidden>Укажите целую сумму от 1&#8239;000&nbsp;₽.</p>
+            <p class="success-text" id="budget-result" role="status"></p>
+          </form>
+        </article>
+        <article class="panel specimen">
+          <h3>Пробел в отчёте</h3>
+          <div class="missing">
+            <div><p class="muted">Стоимость заявки</p><p class="missing-value">—</p></div>
+            <p>Метрика пока не передала данные. Расчёт появится после обновления отчёта.</p>
+          </div>
+          <div class="notice notice-warn">Директ не ответил. Показан последний отчёт от 18 ноября.</div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tokens" class="guide-section" aria-labelledby="tokens-title">
+      <div class="section-heading">
+        <div><h2 id="tokens-title">Визуальные токены</h2><p>Палитра, Onest и шаг отступов 4 px.</p></div>
+        <a href="tokens.css">Открыть CSS-токены</a>
+      </div>
+      <div class="palette">
+        <div class="swatch swatch-dark" style="--swatch:var(--g-ink)"><strong>Графит</strong><code>#040406</code></div>
+        <div class="swatch" style="--swatch:var(--g-canvas)"><strong>Холст</strong><code>#F6F6F8</code></div>
+        <div class="swatch" style="--swatch:var(--g-surface)"><strong>Поверхность</strong><code>#FFFFFF</code></div>
+        <div class="swatch swatch-accent" style="--swatch:var(--g-accent)"><strong>Акцент</strong><code>#00FFFF</code></div>
+        <div class="swatch swatch-dark" style="--swatch:var(--g-link)"><strong>Ссылки и фокус</strong><code>#006C73</code></div>
+      </div>
+      <div class="type-sheet panel">
+        <div class="type-title">Результаты <span class="type-desktop">36/42 · Заголовок</span><span class="type-mobile">28/34 · Заголовок</span></div>
+        <div class="type-number">12&#8239;480&nbsp;₽ <span class="type-desktop">40/44 · Значение</span><span class="type-mobile">32/36 · Значение</span></div>
+        <div class="type-body">Расход за выбранный период <span>15/22 · Основной текст</span></div>
+        <div class="type-label">Источник · Яндекс Директ <span>13/18 · Подпись</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container guide-footer">
+    <span>Редакция 1.0 · 19.11.2026</span>
+    <div><a href="../../docs/handoff/DESIGN.md">Спецификация</a><a href="https://goulash.tech/">Goulash.tech</a></div>
+  </footer>
+</body>
+</html>

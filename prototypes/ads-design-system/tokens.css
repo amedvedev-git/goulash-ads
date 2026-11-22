@@ -1,0 +1,74 @@
+@font-face {
+  font-family: Onest;
+  src: url("../../src/assets/Onest.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --g-font: Onest, "Helvetica Neue", Arial, sans-serif;
+
+  --g-ink: #040406;
+  --g-dark: #17171b;
+  --g-canvas: #f6f6f8;
+  --g-surface: #ffffff;
+  --g-muted: #616169;
+  --g-on-dark-muted: #acacb5;
+  --g-line: #e4e4ea;
+  --g-dark-line: #393940;
+  --g-control-line: #858590;
+  --g-accent: #00ffff;
+  --g-accent-hover: #7fffff;
+  --g-link: #006c73;
+  --g-chart: #008187;
+  --g-ok: #0f7045;
+  --g-ok-bg: #e8f7ef;
+  --g-warn: #775000;
+  --g-warn-bg: #fff5dc;
+  --g-danger: #a12424;
+  --g-danger-bg: #fff0ee;
+  --g-info: #225276;
+  --g-info-bg: #eaf4fc;
+  --g-disabled: #5e5e68;
+  --g-disabled-bg: #ebebef;
+
+  --g-space-1: 4px;
+  --g-space-2: 8px;
+  --g-space-3: 12px;
+  --g-space-4: 16px;
+  --g-space-6: 24px;
+  --g-space-8: 32px;
+  --g-space-12: 48px;
+  --g-space-16: 64px;
+  --g-radius-control: 10px;
+  --g-radius-panel: 16px;
+  --g-radius-pill: 999px;
+  --g-shadow-overlay: 0 12px 28px #0404061f;
+  --g-control-height: 46px;
+  --g-content: 1200px;
+  --g-gutter: 32px;
+  --g-motion: 150ms;
+
+  --g-type-page: 400 36px/42px var(--g-font);
+  --g-type-section: 500 24px/30px var(--g-font);
+  --g-type-item: 550 18px/24px var(--g-font);
+  --g-type-body: 400 15px/22px var(--g-font);
+  --g-type-label: 500 13px/18px var(--g-font);
+  --g-type-number: 400 40px/44px var(--g-font);
+}
+
+@media (max-width: 900px) {
+  :root { --g-gutter: 24px; }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --g-gutter: 16px;
+    --g-type-page: 400 28px/34px var(--g-font);
+    --g-type-number: 400 32px/36px var(--g-font);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --g-motion: 0ms; }
+}

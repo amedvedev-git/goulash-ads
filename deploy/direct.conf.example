@@ -1,0 +1,8 @@
+# Example only. Copy as /etc/systemd/system/goulash-ads.service.d/direct.conf after preparing credentials.
+# Credential source files: root-only 0600; key: exactly 32 random bytes.
+[Service]
+LoadCredential=yandex_direct_client_id:/etc/goulash-ads/yandex_direct_client_id
+LoadCredential=yandex_direct_client_secret:/etc/goulash-ads/yandex_direct_client_secret
+LoadCredential=direct_token_key:/etc/goulash-ads/direct_token_key
+ExecStart=
+ExecStart=/opt/goulash-ads/bin/node /opt/goulash-ads/app/src/server.ts --connect-direct

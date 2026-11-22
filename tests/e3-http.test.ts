@@ -1,0 +1,81 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { once } from 'node:events';
+import { mkdtempSync,readdirSync,unlinkSync,rmdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { e3Browser } from './fixtures/e3-browser.ts';
+test('E3 HTTP: separate real scopes, error and retained input; autonomous closed-page action, off/undo and owner', {timeout:20000},async t=>{
+  const directory=mkdtempSync(join(tmpdir(),'goulash-e3-http-')),x=await e3Browser(directory);
+  t.after(async()=>{await new Promise<void>(resolve=>x.server.close(()=>resolve()));x.db.close();for(const file of readdirSync(directory))unlinkSync(join(directory,file));rmdirSync(directory);});
+  x.server.listen(0,'127.0.0.1');await once(x.server,'listening');const origin=`http://127.0.0.1:${(x.server.address() as any).port}`;
+  const login=await fetch(origin+'/fixture-login/a',{redirect:'manual',signal:t.signal}),cookie=login.headers.get('set-cookie')!.split(';')[0];
+  const get=async(path:string)=>(await fetch(origin+path,{headers:{Cookie:cookie},signal:t.signal})).text();
+  const post=(path:string,values:Record<string,string>)=>fetch(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie},body:new URLSearchParams(values),redirect:'manual',signal:t.signal});
+  const initialCalls=x.calls.length;assert.match(await get('/analytics'),/Нет|Отчётов пока нет/);assert.equal(x.calls.length,initialCalls,'GET pages do not query APIs');
+  assert.equal((await post('/analytics/counter',{revision:'0',counterId:'11001001',confirm:'read'})).status,303);
+  let settings=x.db.readAnalyticsSettings(x.owner);
+  const bad=await post('/analytics/settings',{revision:String(settings.revision),dateFrom:settings.dateFrom,dateTo:'2099-01-01',goalId:'21001001',directRunId:x.db.readDirect(x.owner)!.planId});assert.equal(bad.status,409);assert.match(await bad.text(),/value="2099-01-01"/,'invalid input remains editable');
+  const displayDate = (value: string) => value.split('-').reverse().join('.');
+  const formatted = await post('/analytics/settings',{revision:String(settings.revision),dateFrom:displayDate(settings.dateFrom),dateTo:displayDate(settings.dateTo),goalId:'21001001',directRunId:x.db.readDirect(x.owner)!.planId});
+  assert.equal(formatted.status,303);
+  assert.equal(x.db.readAnalyticsSettings(x.owner).dateFrom,settings.dateFrom);
+  for(const source of ['direct_reports','metrika_site','metrika_direct'])assert.equal((await post('/analytics/refresh',{source})).status,303);
+  const html=await get('/analytics');assert.match(html,/Откуда данные/);assert.match(html,/Тестовые данные/);assert.match(html,/Счётчик фиксирует срабатывания выбранной цели/);assert.match(html,/Отчёт всего сайта охватывает все визиты/);assert.match(html,/Цена заявки по расходу Директа<\/dt><dd>—/);assert.match(html,/20/);assert.match(html,/233,33/);
+  assert.match(html, /id="metrika-title">Яндекс Метрика/);
+  const saved = x.db.readAnalyticsSettings(x.owner), callsBeforeApply = x.calls.length;
+  const filters = {revision:String(saved.revision),dateFrom:displayDate(saved.dateFrom),dateTo:displayDate(saved.dateTo),goalId:saved.goalId!,directRunId:saved.directRunId!};
+  assert.equal((await post('/analytics/settings', filters)).status,303);
+  assert.equal(x.db.readAnalyticsSettings(x.owner).revision,saved.revision);
+  assert.equal((await post('/analytics/settings', {...filters,dateFrom:filters.dateTo})).status,303);
+  const currentReport = /aria-labelledby="real-analytics-title">(?:(?!<\/section>)[\s\S])*data-report-source="direct_reports"/u;
+  assert.doesNotMatch(await get('/analytics'), currentReport);
+  filters.revision=String(x.db.readAnalyticsSettings(x.owner).revision);
+  assert.equal((await post('/analytics/settings', filters)).status,303);
+  assert.match(await get('/analytics'), currentReport);
+  assert.equal(x.calls.length,callsBeforeApply);
+  x.fault.directStatus=500;await post('/analytics/refresh',{source:'direct_reports'});assert.match(await get('/analytics'),/Reports: HTTP 500/);assert.equal(x.db.readAnalyticsReports(x.owner).filter(r=>r.source==='direct_reports'&&r.status==='ready').length,1);
+  const plan=x.db.readPlans(x.owner)[0];assert.equal((await post('/demo/load',{scenario:'control',revision:'0'})).status,409);
+  assert.equal((await post('/demo/load',{scenario:'control',revision:'0',planId:plan.id})).status,303);const before=x.db.readDemo(x.owner)!;
+  assert.equal((await post('/demo/permission',{revision:'0',datasetId:before.datasetId,enabled:'yes'})).status,400);
+  assert.equal((await post('/demo/permission',{revision:'0',datasetId:before.datasetId,enabled:'yes',confirm:'control'})).status,303);
+  const calls=x.calls.length;
+  // No GET or /demo/run while waiting: the actual interval discovers and executes the authorised snapshot.
+  while(x.db.operationsView(x.owner).job?.status!=='completed'){await new Promise(resolve=>setTimeout(resolve,30));t.signal.throwIfAborted();}
+  assert.equal(x.db.operationsView(x.owner).result!.kind,'automation_applied');assert.equal(x.db.readDemo(x.owner)!.state.campaigns[1].remaining,279999);assert.equal(x.calls.length,calls);
+  const automation=await get('/automation');
+  assert.match(automation,/href="\/results"[^>]*>Результаты/);
+  assert.doesNotMatch(automation,/aria-current="page">Автоматика/);
+  const navigation = automation.match(/<nav class="nav" aria-label="Разделы">([\s\S]*?)<\/nav>/)![1];
+  assert.deepEqual([...navigation.matchAll(/>([^<]+)<\/a>/g)].map(match => match[1]), ['Рабочий стол', 'Кампании', 'Подключения']);
+  const operation=x.db.operationsView(x.owner).result!,historyCount=x.db.readHistory(x.owner).length;
+  const history = await get('/history');
+  assert.match(history,/Почему остановили[\s\S]*?Куда ушёл остаток[\s\S]*?816,66[\s\S]*?Общий бюджет/);
+  assert.doesNotMatch(history,/учтён расход 2/);
+  assert.match(await get(`/history?review=${operation.id}`),/Проверьте отмену/);assert.equal(x.db.readHistory(x.owner).length,historyCount);
+  assert.equal((await post('/demo/permission',{revision:'1',datasetId:before.datasetId,enabled:'no'})).status,303);
+  assert.equal((await post('/operations/undo',{id:operation.id,confirm:'undo'})).status,303);assert.deepEqual(x.db.readDemo(x.owner)!.state,before.state);
+  const nextRevision=x.db.readDemo(x.owner)!.revision;await post('/demo/load',{scenario:'missing',revision:String(nextRevision),planId:plan.id});
+  assert.equal(x.db.processDemoJob(),false,'off state prevents new snapshot scheduling');assert.match(await get('/automation'),/Выключено/);
+  const second=await fetch(origin+'/fixture-login/b',{redirect:'manual',signal:t.signal}),otherCookie=second.headers.get('set-cookie')!.split(';')[0];
+  const other=await(await fetch(origin+'/analytics',{headers:{Cookie:otherCookie},signal:t.signal})).text();assert.doesNotMatch(other,/Reports: HTTP 500|233,33|Счётчик 11001001/);
+  const denied=await fetch(origin+'/operations/undo',{method:'POST',headers:{Origin:origin,Cookie:otherCookie},body:new URLSearchParams({id:operation.id,confirm:'undo'}),signal:t.signal});assert.equal(denied.status,404);
+
+  const access = x.db.readAnalyticsSettings(x.owner);
+  assert.doesNotMatch(await get('/analytics'), /name="disconnectProof"/);
+  const proof = (await get('/connections/direct')).match(/action="\/connections\/metrika\/disconnect">(?:(?!<\/form>)[\s\S])*?name="disconnectProof" value="([^"]+)"/)?.[1];
+  assert.ok(proof);
+  const revoke = { confirm: 'disconnect', revision: String(access.revision), directRunId: access.directRunId!, disconnectProof: proof };
+  for (let revision = 0; revision < access.revision; revision++) {
+    const saved = x.db.readAnalyticsSettings('yandex:202');
+    x.db.saveAnalyticsSettings('yandex:202', { ...saved, metrikaEnabled: true, metrikaConfigId: access.metrikaConfigId }, saved.revision);
+  }
+  const staleRevoke = await fetch(origin+'/connections/metrika/disconnect',{method:'POST',headers:{Origin:origin,Cookie:otherCookie},
+    body:new URLSearchParams(revoke),redirect:'manual',signal:t.signal});
+  assert.equal(staleRevoke.status,409);
+  assert.equal(x.db.readAnalyticsSettings('yandex:202').metrikaEnabled,true);
+  assert.equal(x.db.readAnalyticsSettings(x.owner).metrikaEnabled,true);
+  assert.equal((await post('/connections/metrika/disconnect', revoke)).status,303);
+  assert.equal(x.db.readAnalyticsSettings(x.owner).metrikaEnabled,false);
+  assert.doesNotMatch(await get('/connections/direct'), /action="\/connections\/metrika\/disconnect"/);
+});

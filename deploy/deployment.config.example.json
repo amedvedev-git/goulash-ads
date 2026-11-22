@@ -1,0 +1,15 @@
+{
+  "root": "/opt/goulash-ads",
+  "data": "/var/lib/goulash-ads",
+  "backups": "/var/backups/goulash-ads",
+  "node": "/opt/goulash-ads/bin/node",
+  "unit": "goulash-ads.service",
+  "bind": "127.0.0.1",
+  "port": 8767,
+  "publicOrigin": "https://ads.example.org",
+  "suppliersOrigin": "",
+  "credentials": "/etc/goulash-ads",
+  "caddySite": "/etc/caddy/sites/goulash-ads.caddy",
+  "caddyBinary": "/usr/bin/caddy",
+  "caddyConfig": "/etc/caddy/Caddyfile"
+}
