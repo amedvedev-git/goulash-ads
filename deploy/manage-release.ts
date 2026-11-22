@@ -332,7 +332,9 @@ export function productionHost(c: DeploymentConfig = defaults): Host {
         await new Promise((r) => setTimeout(r, 500));
       }
       requireCondition(good, 'Application backend health check failed.');
-      const body = command('curl', ['-fsS', '--max-time', '10', '--resolve', `${origin.hostname}:${origin.port || 443}:127.0.0.1`, c.publicOrigin + '/']);
+      // A newly configured hostname can start serving TLS after Caddy has reloaded.
+      const body = command('curl', ['-fsS', '--retry', '14', '--retry-all-errors', '--retry-delay', '2',
+        '--retry-max-time', '44', '--max-time', '6', '--resolve', `${origin.hostname}:${origin.port || 443}:127.0.0.1`, c.publicOrigin + '/']);
       requireCondition(body.includes('Войти через Яндекс ID') && body.includes('href="/auth/yandex"'), 'HTTPS health check failed.');
       checkSuppliers(c);
     },

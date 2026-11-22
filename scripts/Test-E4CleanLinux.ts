@@ -24,8 +24,8 @@ const unitFile='/etc/systemd/system/'+unit,dropin=unitFile+'.d';
 try{
   const manifest=stageRelease(stage);writeFileSync(join(credentials,'yandex_client_id'),'fixture-clean-login',{mode:0o600});writeFileSync(join(credentials,'yandex_client_secret'),'fixture-clean-secret',{mode:0o600});
   writeFileSync(c.caddyConfig,`{\n admin 127.0.0.1:2019\n local_certs\n skip_install_trust\n}\nimport ${sites}/*.caddy\n`);
-  // Bootstrap the local CA on the same hostname, on a separate test-only port.
-  writeFileSync(join(sites,'ca.caddy'),'https://ads.e4-fixture.invalid:19443 {\n respond 200\n}\n');
+  // Establish trust in the test CA while leaving the application's hostname unissued.
+  writeFileSync(join(sites,'ca.caddy'),'https://ca.e4-fixture.invalid:19443 {\n respond 200\n}\n');
   run('ip',['netns','add',ns]);namespace=true;run('ip',['netns','exec',ns,'ip','link','set','lo','up']);
   const env={...process.env,XDG_DATA_HOME:join(root,'caddy-data'),XDG_CONFIG_HOME:join(root,'caddy-config'),GOULASH_DEPLOY_CONFIG:config,GOULASH_BOOTSTRAP_NODE:process.execPath};
   child=spawn('ip',['netns','exec',ns,caddy,'run','--config',c.caddyConfig],{env,stdio:['ignore','ignore','ignore']});closed=once(child,'close');

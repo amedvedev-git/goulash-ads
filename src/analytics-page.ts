@@ -259,6 +259,7 @@ function campaignTotals(view: AnalyticsView, headline: Headline) {
   return `<article class="card" aria-labelledby="ads-title">
     <div class="card-head"><h2 id="ads-title">Итог по кампании</h2><a class="link" href="${view.campaignId ? campaignTabHref(view.campaignId, 'journal') : '/history'}">История решений</a></div>
     ${row}
+    ${headline.cpa === undefined ? '' : '<p class="card-note">Расход показывает Директ. Стоимость достижения рассчитывает Метрика по стоимости переходов и достижениям в визитах с учтённой стоимостью.</p>'}
     ${issues.length ? `<p class="data-warning">${e(issues.join('. '))}. Сравнение недоступно.</p>` : ''}
   </article>`;
 }
@@ -479,7 +480,7 @@ export function renderAnalytics(view: AnalyticsView, related = '') {
       ['Клики', h.clicks === undefined ? dash : number(h.clicks)],
       ['Расход', h.spend ? e(h.spend) + (h.spendVat ? `<small>${e(h.spendVat)}</small>` : '') : dash],
       ...(h.reaches === undefined ? [] : [['Достижения цели', number(h.reaches)]]),
-      ...(h.cpa === undefined ? [] : [['Стоимость достижения', e(rubles(h.cpa))]]),
+      ...(h.cpa === undefined ? [] : [['Стоимость достижения', e(rubles(h.cpa)) + '<small>По данным Метрики</small>']]),
     ];
     const stats = `<dl class="campaign-result-metrics">${metrics.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
     return `${controls(view)}

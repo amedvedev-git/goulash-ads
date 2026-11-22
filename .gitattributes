@@ -3,6 +3,6 @@
 *.md text eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
-
-# Acceptance corpus is pinned by its original byte hash.
-tests/fixtures/judge-challenge-02.json -text
+*.tgz binary
+*.ttf binary
+*.png binary
