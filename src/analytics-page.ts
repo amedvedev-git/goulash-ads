@@ -126,7 +126,7 @@ function controls(view: AnalyticsView) {
       campaignPeriodFields(savedDate('dateFrom'), savedDate('dateTo'), lastDay, view)) + `
       <p class="field-error campaign-period-error" id="campaign-period-error" role="status">${e(view.errors?.dateFrom ?? view.errors?.dateTo ?? '')}</p>
       <button type="submit" name="period" value="custom" class="secondary campaign-period-apply" data-period-submit>Применить</button>`
-      : renderCampaignPanelHeading('results')) : selected ? `<div class="period-seg" role="group" aria-label="Период">
+      : renderCampaignPanelHeading('results')) : selected || view.canRefresh.metrika_site ? `<div class="period-seg" role="group" aria-label="Период">
       <!-- The first submit button handles Enter in the date fields. -->
       <button type="submit" name="period" value="custom" hidden></button>
       ${presetButtons}
@@ -139,9 +139,9 @@ function controls(view: AnalyticsView) {
         </div>
       </details>
     </div>` : ''}
-    ${fixedRun ? `<input type="hidden" name="directRunId" value="${e(available[0].planId)}">` : `<div class="campaign-field">
+    ${!view.campaignId && !available.length ? '<input type="hidden" name="directRunId" value="">' : fixedRun ? `<input type="hidden" name="directRunId" value="${e(available[0].planId)}">` : `<div class="campaign-field">
       <div class="campaign-filter"><label for="analytics-run">Кампания</label>
-      <span class="filter-select"><select id="analytics-run" name="directRunId"><option value="">Выберите кампанию</option>${available.map(run => `<option value="${e(run.planId)}"${selected === run.planId ? ' selected' : ''}>${e(readableDirectName(run.name, run.planId))}</option>`).join('')}</select>${uiIcon('chevron', 16)}</span></div>
+      <span class="filter-select"><select id="analytics-run" name="directRunId"><option value="">${!view.campaignId && view.canRefresh.metrika_site ? 'Весь сайт' : 'Выберите кампанию'}</option>${available.map(run => `<option value="${e(run.planId)}"${selected === run.planId ? ' selected' : ''}>${e(readableDirectName(run.name, run.planId))}</option>`).join('')}</select>${uiIcon('chevron', 16)}</span></div>
       ${selected && !view.campaignId && counter && view.metrikaContextCurrent ? `<div class="campaign-filter"><label for="analytics-goal">Цель</label><span class="filter-select"><select id="analytics-goal" name="goalId"><option value="">Выберите цель</option>${counter.goals.map(item => `<option value="${e(item.id)}"${item.id === goal ? ' selected' : ''}>${e(item.name)}</option>`).join('')}</select>${uiIcon('chevron', 16)}</span></div>` : ''}
       <button type="submit" class="secondary" formnovalidate>Показать</button>
     </div>`}
@@ -354,7 +354,7 @@ function budgetCard(view: AnalyticsView, headline: Headline) {
 function refreshCard(view: AnalyticsView, hasData: boolean, metrics = '', showMetrika = true) {
   const now = Date.now();
   const { currentReports, reports, canRefresh } = view;
-  const directRecovery = !canRefresh.direct_reports ? (() => {
+  const directRecovery = !canRefresh.direct_reports && (view.campaignId || view.settings.directRunId) ? (() => {
     const run = view.runs.find(item => item.planId === view.settings.directRunId);
     return `<p>${e(view.directReason ?? 'Проверьте подключение Директа.')}
       <a class="inline-link" data-recovery href="${e(connectionHref(view.campaignId ?? run?.campaignId ?? 'default', 'results', view.campaignId ? undefined : run?.planId))}#connect-title">Проверить подключение Директа</a></p>`;
@@ -451,14 +451,26 @@ function previousReports(view: AnalyticsView) {
 export function renderAnalytics(view: AnalyticsView, related = '') {
   const { settings } = view;
   const heading = '<div class="page-head results-head"><div><h1>Результаты</h1></div></div>';
+  const run = view.runs.find(item => item.planId === settings.directRunId && item.steps.campaign.phase === 'confirmed');
+  if (!view.campaignId && !run && view.canRefresh.metrika_site) {
+    const goal = settings.counter?.goals.find(item => item.id === settings.goalId);
+    const siteReports = view.currentReports.filter(report => report.source === 'metrika_site');
+    return `${heading}${related}
+      <p class="lead">${e(settings.counter?.domain ?? '')} · цель «${e(goal?.name ?? '')}» · ${date(settings.dateFrom)} — ${date(settings.dateTo)} МСК</p>
+      ${controls(view)}
+      ${refreshCard(view, siteReports.some(report => report.status === 'ready'), '', false)}
+      ${siteReports.map(reportRow).join('')}
+      ${previousReports(view)}`;
+  }
+  const setupMetrika = `<p>Для отчёта по всему сайту выберите счётчик и цель в <a href="${routes.connection}?panel=metrika">подключениях Метрики</a>.</p>`;
   if (!view.runs.some(item => item.steps.campaign.phase === 'confirmed')) {
     return `${view.campaignId ? renderCampaignPanelHeading('results') : heading}
-      ${related}<section class="card"><p>Отчёты появятся после создания кампании в Директе.</p>
+      ${related}<section class="card">${view.campaignId ? '' : setupMetrika}
+      <p>Отчёты по рекламе появятся после создания кампании в Директе.</p>
       <a class="button primary" href="${view.campaignId ? e(campaignTabHref(view.campaignId, 'summary')) : routes.campaigns}">${view.campaignId ? 'Открыть сводку' : 'Перейти к кампаниям'}</a></section>
       ${previousReports(view)}`;
   }
-  const run = view.runs.find(item => item.planId === settings.directRunId && item.steps.campaign.phase === 'confirmed');
-  if (!run) return view.campaignId ? controls(view) + related : `<div class="page-head results-head"><div><h1>Результаты</h1><p class="lead">Выберите кампанию для отчёта.</p></div></div>${controls(view)}`;
+  if (!run) return view.campaignId ? controls(view) + related : `${heading}<p class="lead">Выберите кампанию для отчёта по рекламе.</p>${controls(view)}${setupMetrika}`;
   const h = headline(view);
   // Direct first: it owns spend, impressions and clicks; Metrika follows by scope.
   const order: AnalyticsSource[] = ['direct_reports', 'metrika_direct', 'metrika_daily', 'metrika_site'];
