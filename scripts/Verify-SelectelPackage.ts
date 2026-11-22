@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 import { openDatabase as openOldDatabase } from '../tests/fixtures/selectel-stage2/src/database.ts';
 import { previousFixture } from '../tests/fixtures/e4-deployment.ts';
 import { inspectDatabase, inventory, sha256 } from '../deploy/manage-release.ts';
@@ -27,7 +28,22 @@ for(const schema of [2,9,10] as const){
   const db=join(paths.data,'stage2.sqlite'),before=inspectDatabase(db),oldFiles=inventory(app);assert.equal(before.schema,schema);
   const events:string[]=[],host={async checkBefore(){events.push('simulated precheck');},async stop(){events.push('simulated stop');},async start(){events.push('simulated start');},async health(){events.push('simulated health');}};
   const installed=await release.update(paths,host,candidate),migrated=inspectDatabase(db);assert.equal(migrated.schema,11);
-  for(const [table,hash] of Object.entries(before.tables))if(table!=='demo_jobs'&&table!=='direct_bindings')assert.equal(migrated.tables[table],hash);
+  // v11 adds campaign_id. Compare every pre-existing column, in its original order.
+  const original = new DatabaseSync(join(paths.backups, installed.id, 'before.sqlite'), { readOnly: true });
+  const current = new DatabaseSync(db, { readOnly: true });
+  const identifier = (name: string) => '"' + name.replaceAll('"', '""') + '"';
+  try {
+    for (const [table, hash] of Object.entries(before.tables)) {
+      if (table === 'demo_jobs' || table === 'direct_bindings') continue; // verified by the release migration
+      const columns = original.prepare('SELECT name FROM pragma_table_info(?) ORDER BY cid').all(table);
+      const projection = columns.map(column => identifier(String(column.name))).join(', ');
+      const rows = current.prepare(`SELECT ${projection} FROM ${identifier(table)} ORDER BY rowid`).all();
+      assert.equal(sha256(JSON.stringify(rows)), hash, table);
+    }
+  } finally {
+    current.close();
+    original.close();
+  }
   copyFileSync(db,join(run,'migrated-v10.sqlite'));
   const repeat=await release.update(paths,host,candidate);assert.equal(repeat.status,'already-installed');const reverted=await release.rollback(paths,host);
   assert.deepEqual(inspectDatabase(db),before);assert.deepEqual(inventory(app),oldFiles);
