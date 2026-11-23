@@ -73,21 +73,36 @@ export function createMetrikaConnections(db: ReturnType<typeof openDatabase>, co
         headers: { Authorization: `Basic ${credentials}` },
         body: new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: verifier }),
       });
-      if (!response.ok) throw new Error();
-      const token = await response.json();
+      const token = await response.json().catch(() => undefined);
+      if (!response.ok) {
+        switch (token?.error) {
+          case 'invalid_grant':
+          case 'bad_verification_code':
+            throw new DirectError('Код Метрики неверен, просрочен или уже использован. Получите новый код.');
+          case 'invalid_client':
+          case 'unauthorized_client':
+            throw new DirectError('Яндекс отклонил настройки приложения Метрики. Обратитесь к администратору.');
+          case 'invalid_scope':
+            throw new DirectError('Яндекс не выдал право на чтение Метрики. Обратитесь к администратору.');
+        }
+        throw new DirectError('Яндекс не подтвердил выдачу доступа к Метрике. Повторите подключение позже.');
+      }
       if (typeof token?.access_token !== 'string' || !/^[\x21-\x7e]{1,16000}$/.test(token.access_token)
-        || !Number.isSafeInteger(token.expires_in) || token.expires_in <= 0 || token.expires_in > 10 * 366 * 86400
-        || (token.scope !== undefined && token.scope !== scope)) throw new Error();
+        || !Number.isSafeInteger(token.expires_in) || token.expires_in <= 0 || token.expires_in > 10 * 366 * 86400)
+        throw new DirectError('Яндекс вернул некорректные данные для доступа к Метрике. Обратитесь к администратору.');
+      if (token.scope !== undefined && token.scope !== scope)
+        throw new DirectError('Яндекс выдал неожиданный набор прав для Метрики. Обратитесь к администратору.');
       const expiresAt = Date.now() + token.expires_in * 1000;
       const identity = await transport('https://login.yandex.ru/info?format=json', {
         headers: { Authorization: `OAuth ${token.access_token}` }, redirect: 'error', signal: AbortSignal.timeout(10_000),
       });
-      if (!identity.ok) throw new Error();
-      const profile = await identity.json();
-      if (profile?.client_id !== config.clientId || typeof profile.id !== 'string') throw new Error();
+      const profile = identity.ok ? await identity.json().catch(() => undefined) : undefined;
+      if (profile?.client_id !== config.clientId || typeof profile.id !== 'string')
+        throw new DirectError('Не удалось подтвердить Яндекс ID для доступа к Метрике. Повторите подключение позже.');
       return { access: token.access_token as string, expiresAt, ownerMatches: `yandex:${profile.id}` === owner };
-    } catch {
-      throw new DirectError('Код Метрики не подтверждён или Яндекс недоступен. Получите новый код.');
+    } catch (error) {
+      if (error instanceof DirectError) throw error;
+      throw new DirectError('Не удалось связаться с Яндексом для подключения Метрики. Повторите подключение позже.');
     }
   }
 

@@ -43,6 +43,8 @@ body:has(.connection-dialog[open]){overflow:hidden;padding-inline-end:var(--conn
 .connection-dialog :is(button,.button,input,select){max-width:100%}
 .connection-dialog .field{margin:0}.connection-dialog .field label{margin-bottom:5px;font-size:13px}
 .connection-dialog .field :is(input,select){background:var(--wash);font-size:14px;min-height:44px}
+.connection-dialog form:has(#metrika-code){display:grid;gap:var(--connection-gap)}
+.connection-dialog form:has(#metrika-code)>button{justify-self:start}
 .connection-field-grid{display:grid;gap:var(--connection-gap)}
 .connection-select{position:relative;min-width:0}
 .field .connection-select select{appearance:none;padding-inline:12px 42px}
@@ -71,16 +73,25 @@ body:has(.connection-dialog[open]){overflow:hidden;padding-inline-end:var(--conn
 #main .connection-dialog .connection-disconnect>summary{position:static;display:inline-flex;justify-content:center;margin:0;padding:10px 14px;min-height:44px;border:1px solid #bc8f8f;border-radius:8px;background:var(--surface);color:var(--danger)}
 #main .connection-dialog .connection-disconnect>summary::after{content:none}
 #main .connection-dialog .connection-disconnect>summary:hover{background:#fff1ef}
+#main .connection-dialog .connection-disconnect[data-native-disconnect][open]{width:100%}
+#main .connection-dialog .connection-disconnect[data-native-disconnect][open]>summary,
+.connection-access:has(>.connection-disconnect[data-native-disconnect][open])>form,
+.connection-dialog[data-confirming] :is([data-native-confirm-title],[data-native-confirm-cancel]){display:none}
 .connection-confirm{display:grid;gap:18px;padding-top:10px}
 .connection-dialog>.connection-confirm{grid-row:2;padding:var(--connection-edge)}
 .connection-confirm .connection-buttons{justify-content:flex-end}
 .connection-danger-primary{background:var(--danger);border-color:var(--danger);color:white}.connection-danger-primary:hover{background:#811919}
 .connection-dialog[data-confirming] .connection-badge{display:none}
 .connection-error-inline{color:var(--error);margin:0;font-size:14px}
+.connection-dialog-body>.notice{margin:0}
 
 .connection-tip-button{display:grid;place-items:center;flex:none;width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--teal)}
 .connection-tip-button:hover{background:#e7f3f3;color:var(--teal)}
-.connection-tip{position:fixed;inset:auto;margin:0;visibility:hidden;width:300px;padding:10px 13px;border:1px solid #91b5b5;border-radius:8px;background:#f1fbfa;color:#244747;box-shadow:0 8px 24px #10233124;font-size:14px;line-height:1.45}
+.connection-tip{position:fixed;inset:0;margin:auto;width:300px;max-width:calc(100vw - 32px);padding:10px 13px;border:1px solid #91b5b5;border-radius:8px;background:#f1fbfa;color:#244747;box-shadow:0 8px 24px #10233124;font-size:14px;line-height:1.45}
+@supports (position-area:block-end span-inline-start){
+  .connection-tip{inset:auto;margin-block:7px;margin-inline:0;position-area:block-end span-inline-start;position-try-fallbacks:flip-block,flip-inline,flip-block flip-inline,block-end,block-start}
+}
+.connection-tip[data-positioned]{inset:auto;margin:0;position-area:none;position-try-fallbacks:none}
 @media(max-width:1120px){.connection-settings{--connection-edge:18px}.connection-card-heading{column-gap:7px}.connection-name{gap:7px}.connection-card h2{font-size:17px}.connection-card .connection-badge{font-size:14px;gap:4px;padding-inline:5px}}
 @media(max-width:1000px){.connection-settings{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){

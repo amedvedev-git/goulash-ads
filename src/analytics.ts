@@ -444,7 +444,7 @@ export function createAnalyticsService(db:ReturnType<typeof openDatabase>,resolv
     check();
     const found=await metrikaRead(owner,provider,{workspaceId:campaignId,counterId:counter.id,goalId},['test_goal',test.marker],check,
       guard=>provider.api.testGoal!(counter.id,goalId,moscowDate(test.startedAt),moscowDate(Date.now()),test.marker,guard,new URL(landing).hostname));
-    if(!found) return false;
+    if(found!==true) return found;
     saveScope(owner,campaignId,saved,{...scope,measurement:{...measurement,test:{...test,verifiedAt:Date.now()}}},true,true);
     return true;
   }

@@ -29,6 +29,7 @@ function fixture(t: TestContext) {
 
   let codeExchanges = 0, counterReads = 0, identity = '101', challenge: string | null = null;
   let exchangeGate: Promise<void> | undefined, readGate: Promise<void> | undefined;
+  let exchangeError: string | undefined;
   const codec = createSecretCodec({ platform: 'linux', key: Buffer.alloc(32, 17) });
   const wrappedCodec: SecretCodec = {
     protect: codec.protect,
@@ -49,6 +50,7 @@ function fixture(t: TestContext) {
       assert.equal(query.get('code'), 'fixture-code');
       assert.equal(createHash('sha256').update(query.get('code_verifier')!).digest('base64url'), challenge);
       await exchangeGate;
+      if (exchangeError) return Response.json({ error: exchangeError, error_description: 'provider-detail' }, { status: 400 });
       return Response.json({ access_token: access, scope: 'metrika:read', expires_in: 3600 });
     }
     assert.equal(new Headers(request?.headers).get('authorization'), 'OAuth ' + access);
@@ -72,6 +74,7 @@ function fixture(t: TestContext) {
     return attempt.state;
   }
   return { db, config, connections, start, differentUser: () => { identity = '202'; },
+    setExchangeError: (error?: string) => { exchangeError = error; },
     counts: () => [codeExchanges, counterReads],
     holdExchange() { const gate = Promise.withResolvers<void>(); exchangeGate = gate.promise; return gate.resolve; },
     holdRead() { const gate = Promise.withResolvers<void>(); readGate = gate.promise; return gate.resolve; },
@@ -158,4 +161,26 @@ test('Метрика OAuth: выдача кода под другим Яндек
   x.differentUser();
   await assert.rejects(x.connections.finish(owner, session, form(x.start())), /тот же аккаунт/);
   assert.deepEqual(x.db.readAnalyticsSettings(owner), stored);
+});
+
+test('Метрика OAuth: отличает ошибку кода от ошибки приложения и сохраняет прежний доступ', async t => {
+  const x = fixture(t);
+  await x.connections.finish(owner, session, form(x.start()));
+  const stored = x.db.readAnalyticsSettings(owner);
+  for (const [error, message] of [
+    ['invalid_grant', /Код Метрики неверен, просрочен или уже использован/],
+    ['invalid_client', /Яндекс отклонил настройки приложения Метрики/],
+    ['invalid_scope', /Яндекс не выдал право на чтение Метрики/],
+  ] as const) {
+    x.setExchangeError(error);
+    await assert.rejects(x.connections.finish(owner, session, form(x.start())), (caught: Error) => {
+      assert.match(caught.message, message);
+      assert.doesNotMatch(caught.message, /provider-detail/);
+      return true;
+    });
+    assert.deepEqual(x.db.readAnalyticsSettings(owner), stored);
+  }
+  x.setExchangeError();
+  await x.connections.finish(owner, session, form(x.start()));
+  assert.equal(x.connections.view(owner, session).status, 'connected');
 });

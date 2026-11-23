@@ -17,10 +17,30 @@ test('Метрика показывает следующий шаг для те�
   assert.doesNotMatch(admin, /попросите владельца|Восстановить доступ к Метрике|Подключить Метрику/);
   const first = renderConnectionSettings({ ...view, metrikaAccess: { status: 'disconnected', revision: 1 } });
   assert.match(first, /попросите владельца дать вам доступ[\s\S]*Подключить Метрику/);
+  assert.match(first, /получите одноразовый код в Яндексе и введите его здесь/);
   assert.doesNotMatch(first, /Попросите администратора|Восстановить доступ к Метрике/);
   const expired = renderConnectionSettings({ ...view, metrikaAccess: { status: 'expired', revision: 1 } });
   assert.match(expired, /Доступ истёк[\s\S]*Восстановить доступ к Метрике/);
   assert.doesNotMatch(expired, /Попросите администратора|попросите владельца/);
+});
+
+test('карточка Метрики показывает только актуальную привязку', () => {
+  const counter = { id: '11001001', domain: 'rollstar.example', mirrors: [], goals: [{ id: '42', name: 'Покупка', type: 'action', condition: '' }] };
+  const metrika = { configured: true, enabled: true, current: false, legacy: true, canList: true, counter, goalId: '42' };
+  const view = { revision: 1, campaigns: [], metrika, metrikaAccess: { status: 'connected' as const, revision: 1, disconnectProof: 'test' } };
+  const connected = renderConnectionSettings(view);
+  assert.match(connected, /Доступ получен[\s\S]*Выберите счётчик и цель для отчётов/);
+  assert.doesNotMatch(connected, /rollstar\.example|Покупка/);
+  assert.match(connected, /<a[^>]+data-native-confirm-cancel[^>]*>Отмена<\/a>/);
+  assert.match(connected, /<button[^>]+value="disconnect">Отключить Метрику<\/button>/);
+
+  const ready = renderConnectionSettings({ ...view, metrika: { ...metrika, current: true } });
+  assert.match(ready, /Включена[\s\S]*rollstar\.example[\s\S]*Покупка/);
+  assert.doesNotMatch(ready, /Выберите счётчик и цель для отчётов/);
+  const off = renderConnectionSettings({ ...view, metrika: { ...metrika, configured: false, enabled: false, disconnected: true },
+    metrikaAccess: { status: 'disconnected', revision: 1 } });
+  assert.match(off, /Отключена[\s\S]*Подключить Метрику/);
+  assert.doesNotMatch(off, /rollstar\.example|Покупка|Счётчик и цель/);
 });
 
 test('подключения сохраняют отдельные цели кампаний и проверяют только отмеченный визит', async t => {
@@ -36,7 +56,7 @@ test('подключения сохраняют отдельные цели ка
     return id;
   };
   const a = create('first.example'), b = create('second.example');
-  let probes = 0;
+  let probes = 0, goalFound = false;
   const provider: MetrikaProvider = { owner: 'local', mode: 'fixture', configId: 'fixture', api: {
     async counter(id) {
       return { id, domain: id === '123' ? 'first.example' : 'second.example', mirrors: [], goals: [
@@ -48,7 +68,7 @@ test('подключения сохраняют отдельные цели ка
       assert.deepEqual([counter, goal, domain], ['123', '456', 'first.example']);
       assert.match(marker, /^[a-f0-9]{32}$/);
       probes++;
-      return true;
+      return goalFound ? true : 'not_found';
     },
     async report() { throw new Error('Unexpected report'); },
     async daily() { throw new Error('Unexpected report'); },
@@ -89,11 +109,19 @@ test('подключения сохраняют отдельные цели ка
   assert.ok(saved().campaignAnalytics?.[a].measurement?.counterCheckedAt);
   assert.equal((await post('goal', a, { goalId: '456' })).status, 303);
   assert.equal((await post('test', a)).status, 303);
-  assert.match(await get(a), /goulash_test=[a-f0-9]{32}/);
+  const testLink = saved().campaignAnalytics?.[a].measurement?.test;
+  assert.ok(testLink?.marker);
+  const emptyResult = await post('verify', a, { returnPanel: 'metrika' });
+  assert.equal(emptyResult.status, 200);
+  const dialog = (await emptyResult.text()).match(/<dialog[^>]*id="connection-metrika"[\s\S]*?<\/dialog>/)?.[0] ?? '';
+  assert.match(dialog, /class="notice neutral" role="status"[^>]*><p>Тестовая заявка пока не найдена<\/p>/);
+  assert.match(dialog, new RegExp(`goulash_test=${testLink.marker}`));
+  assert.deepEqual(saved().campaignAnalytics?.[a].measurement?.test, testLink);
+  goalFound = true;
   assert.equal((await post('verify', a)).status, 303);
   assert.match(await get(a), /Тестовая заявка подтверждена\. Проверено <time/);
   assert.doesNotMatch(await get(b), /Тестовая заявка подтверждена|value="123"/);
-  assert.equal(probes, 1);
+  assert.equal(probes, 2);
   const before = saved();
   const preview = await post('inspect', b, { counterId: '812' });
   assert.equal(preview.status, 200);

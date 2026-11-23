@@ -130,6 +130,10 @@ export function renderPage(value: string | undefined, message = '', isError = fa
   const footer = options.pilot || section === 'pilot' ? 'Учебные данные · реальные показы не включаются'
     : oauth || (context && guidedRun?.launch) || options.directLaunch ? 'Управление кампаниями Яндекс Директа'
     : 'Подготовка черновика в Яндекс Директе · показы не включаются';
+  const noticeStyle = options.noticeVariant ?? (isError ? 'error' : '');
+  const notice = message ? `<div id="notification" class="notice${noticeStyle ? ' ' + noticeStyle : ''}" role="${noticeStyle === 'error' ? 'alert' : 'status'}" tabindex="-1"><p>${e(message)}</p>${options.journalRecovery ? `<a class="task-link" href="${e(options.journalRecovery)}">Вернуться к записи журнала</a>` : ''}${fields.length ? `<ul>${fields.map(([key, error]) => `<li><a href="#${prefix}-${key}">${labels[key as keyof CampaignDraft]}: ${e(error!)}</a></li>`).join('')}</ul>` : ''}</div>` : '';
+  const metrikaNotice = section === 'connections' && campaign && !options.connectionRecoveryHref && options.connectionSettings?.panel === 'metrika' ? notice : '';
+  const pageNotice = metrikaNotice ? '' : notice;
   let body: string;
   if (options.pilot) body = renderPilot(options.pilot, section === 'pilot', options.pilotOptions);
   else if (section === 'pilot' && campaign) body = renderPilotIntro();
@@ -141,7 +145,7 @@ export function renderPage(value: string | undefined, message = '', isError = fa
         <a class="button secondary" data-login-return href="${e(options.connectionRecoveryHref)}">Войти под другим аккаунтом</a>
       </div></section>`;
   else if (section === 'connections' && campaign) body = renderDirectConnect(options.connect, options.direct, options.connectionCampaign,
-    options.connectionSettings ? renderConnectionSettings(options.connectionSettings) : '', options.connectionSettings?.error, options.connectionSettings?.panel);
+    options.connectionSettings ? renderConnectionSettings(options.connectionSettings, metrikaNotice) : '', options.connectionSettings?.error, options.connectionSettings?.panel);
   else if (!campaign) {
     const trainingLogin = section === 'pilot' ? options.trainingLoginHref : undefined;
     const pilotLogin = section === 'pilot' && (options.publicPilot || trainingLogin);
@@ -188,13 +192,11 @@ export function renderPage(value: string | undefined, message = '', isError = fa
   }
   else body = '';
   const directPanel = Boolean(options.direct && (options.direct.state || options.direct.input || !options.direct.ownChief));
-  const noticeStyle = options.noticeVariant ?? (isError ? 'error' : '');
-  const notice = message ? `<div id="notification" class="notice${noticeStyle ? ' ' + noticeStyle : ''}" role="${noticeStyle === 'error' ? 'alert' : 'status'}" tabindex="-1"><p>${e(message)}</p>${options.journalRecovery ? `<a class="task-link" href="${e(options.journalRecovery)}">Вернуться к записи журнала</a>` : ''}${fields.length ? `<ul>${fields.map(([key, error]) => `<li><a href="#${prefix}-${key}">${labels[key as keyof CampaignDraft]}: ${e(error!)}</a></li>`).join('')}</ul>` : ''}</div>` : '';
   const title = context ? `${campaignTabs[context.tab]} · ${context.name}` : titles[section];
   const paneHeading = context?.tab === 'summary' || context?.tab === 'ads' ? renderCampaignPanelHeading(context.tab) : '';
   const contents = context
-    ? renderCampaignHeader(context) + `<div class="campaign-workspace">${renderCampaignTabs(context)}<section data-campaign-panel aria-labelledby="campaign-tab-${context.tab}" tabindex="-1">${paneHeading}${notice}${body}</section></div>`
-    : notice + body;
+    ? renderCampaignHeader(context) + `<div class="campaign-workspace">${renderCampaignTabs(context)}<section data-campaign-panel aria-labelledby="campaign-tab-${context.tab}" tabindex="-1">${paneHeading}${pageNotice}${body}</section></div>`
+    : pageNotice + body;
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#040406"><title>${e(title)} · Goulash Реклама</title><style>${styles}</style><script src="/assets/ui-client.js" defer></script>${section === 'connections' ? '<script src="/assets/connection-client.js" defer></script>' : ''}</head><body data-scope="${e(options.scope ?? 'anonymous')}">
     <a class="skip" href="#main">К содержимому</a><header class="topbar"><div class="topbar-inner">

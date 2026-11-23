@@ -148,16 +148,19 @@
     if (anchor.bottom <= body.top || anchor.top >= body.bottom) return tip.hidePopover();
     const { width, height, offsetLeft: x, offsetTop: y } = window.visualViewport ?? { width: innerWidth, height: innerHeight, offsetLeft: 0, offsetTop: 0 };
     const edge = 12;
+    tip.dataset.positioned = '';
     tip.style.maxWidth = `${width - edge * 2}px`;
     const below = anchor.bottom + 7;
     tip.style.left = `${Math.max(x + edge, Math.min(anchor.left, x + width - tip.offsetWidth - edge))}px`;
     tip.style.top = `${below + tip.offsetHeight <= y + height - edge ? below : Math.max(y + edge, anchor.top - tip.offsetHeight - 7)}px`;
-    tip.style.visibility = 'visible';
   }
   settings.addEventListener('toggle', event => {
     if (!event.target.matches('.connection-tip')) return;
     if (event.newState === 'open') placeTip();
-    else event.target.style.visibility = 'hidden';
+    else {
+      delete event.target.dataset.positioned;
+      event.target.removeAttribute('style');
+    }
   }, true);
   settings.addEventListener('scroll', placeTip, true);
   addEventListener('resize', placeTip);
@@ -271,7 +274,13 @@
       const current = panels.get(key);
       current.previousElementSibling.replaceWith(fresh.previousElementSibling);
       current.replaceChildren(...fresh.childNodes);
+      if (key === 'metrika') enhanceMetrika(current);
     }
+  }
+
+  function enhanceMetrika(panel) {
+    for (const control of panel.querySelectorAll('[data-metrika-native]')) control.hidden = true;
+    for (const control of panel.querySelectorAll('[data-metrika-enhanced]')) control.hidden = false;
   }
 
   async function readPage(response) {
@@ -354,5 +363,8 @@
       void savePair(form, event.submitter);
     } else if (saving && openKey() === 'metrika') event.preventDefault();
   });
-  if (pair()) updateMeasurementControls(pair());
+  if (pair()) {
+    updateMeasurementControls(pair());
+    enhanceMetrika(panels.get('metrika'));
+  }
 })();

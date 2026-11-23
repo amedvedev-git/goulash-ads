@@ -32,11 +32,12 @@ export function connectionBlock(title: string, body: string, help = '') {
 export const connectionFacts = (rows: [string, string][]) => rows.length ? `<dl class="connection-facts">${rows.map(([label, value]) =>
   `<div><dt>${e(label)}</dt><dd>${e(value)}</dd></div>`).join('')}</dl>` : '';
 
-export function connectionDisconnect(title: string, description: string, action: string, body: string, label: string) {
-  return `<details class="connection-disconnect"><summary class="button connection-danger-button" aria-label="${e(title.replace(/\?$/, ''))}">Отключить</summary>
-    <div class="connection-confirm" data-confirm-title="${e(title)}"><p>${e(description)}</p>
+export function connectionDisconnect(title: string, description: string, action: string, body: string, label: string, cancelHref?: string) {
+  return `<details class="connection-disconnect"${cancelHref ? ' data-native-disconnect' : ''}><summary class="button connection-danger-button" aria-label="${e(title.replace(/\?$/, ''))}">${cancelHref ? e(label) : 'Отключить'}</summary>
+    <div class="connection-confirm" data-confirm-title="${e(title)}">${cancelHref ? `<p data-native-confirm-title><strong>${e(title)}</strong></p>` : ''}<p>${e(description)}</p>
       <form class="connection-buttons" method="post" action="${action}">${body}
         <button class="secondary" type="button" data-cancel-confirm hidden>Отмена</button>
+        ${cancelHref ? `<a class="button secondary" href="${e(cancelHref)}" data-native-confirm-cancel>Отмена</a>` : ''}
         <button class="connection-danger-primary" type="submit" name="confirm" value="disconnect">${e(label)}</button></form>
     </div></details>`;
 }

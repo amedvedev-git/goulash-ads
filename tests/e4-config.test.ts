@@ -40,6 +40,27 @@ test('E4 server research: default off/no secret read, invalid enable/owner/flags
   if(process.platform!=='win32'){chmodSync(join(dir,'phrase_ai_key'),0o644);assert.throws(()=>loadServerResearch(true,['--wordstat','--phrase-ai'],env,request),/владельц/);}
 });
 
+test('серверный режим ИИ для всех требует вход и открывает только DeepSeek', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'e4-ai-all-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'phrase_ai_key'), 'fictional-key', { mode: 0o600 });
+  const env = { CREDENTIALS_DIRECTORY: dir, GOULASH_RESEARCH_ENABLED: 'ai-all' };
+  assert.throws(() => loadServerResearch(false, [], env), /Яндекс ID/);
+  const calls: string[] = [];
+  const ai = loadServerResearch(true, [], env, async url => {
+    calls.push(String(url));
+    return Response.json({ model: 'deepseek-flash', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(e1Profile) } }] });
+  });
+  assert.equal(ai.allowed('yandex:101'), true);
+  assert.equal(ai.allowed('yandex:202'), true);
+  assert.equal(ai.allowed('local'), false);
+  assert.equal(ai.wordstat, undefined);
+  assert.deepEqual(calls, []);
+  await ai.intelligence!.profile(e1Input);
+  assert.deepEqual(calls, ['https://api.deepseek.com/chat/completions']);
+  assert.equal(loadServerResearch(true, [], { GOULASH_RESEARCH_ENABLED: '0' }).allowed('yandex:101'), false);
+});
+
 test('E4-HEALTH-01: backend health preserves exact public Host and does not follow redirects',async t=>{
   const server=createServer((req,res)=>{if(req.headers.host==='timeout.invalid')return;if(req.headers.host==='error.invalid')return res.writeHead(500).end('fixture error');if(req.headers.host!=='e4-fixture.invalid')return res.writeHead(400).end('wrong authority');res.writeHead(302,{Location:'https://never-contact.invalid'}).end('fixture');});
   server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise<void>(r=>server.close(()=>r())));

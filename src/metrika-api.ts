@@ -10,6 +10,8 @@ export type MetrikaQuery = {counterId:string;goalId:string;dateFrom:string;dateT
 export type MetrikaReport = {status:'ready'|'empty';metrics:{visits:number|null;reaches:number|null;goalVisits:number|null;cost:number|null;cpa:number|null};
   complete:boolean;issues:string[];dataLag:number;sampled:boolean;sampleShare:number|null;query:Record<string,unknown>};
 const id=(value:unknown)=>{const s=String(value);if(!/^[1-9]\d{0,18}$/.test(s))throw new DirectError('Некорректный ID Метрики.');return s;};
+const counterDomain = (counter?: { site?: unknown; domain?: unknown; site2?: { site?: unknown } }) =>
+  counter?.site2?.site ?? counter?.site ?? counter?.domain;
 export function metrikaParams(q:MetrikaQuery){
   const ad=Boolean(q.campaignId),g=id(q.goalId);
   const metrics=ad?[`ym:ad:RUBConvertedAdCost`,`ym:ad:goal${g}reaches`,`ym:ad:goal${g}visits`,`ym:ad:goal${g}convertedRUBCPA`]:['ym:s:visits',`ym:s:goal${g}reaches`,`ym:s:goal${g}visits`];
@@ -86,13 +88,15 @@ export function createMetrikaApi(token:()=>Promise<string>,transport:typeof fetc
     try{return JSON.parse(text);}catch{throw new DirectError('Метрика: некорректный JSON.');}
   }
   return {async counters(beforeSend?: () => void): Promise<MetrikaCounterChoice[]> {
-    const data = await get('/management/v1/counters', new URLSearchParams({ per_page: '100', offset: '0' }), beforeSend);
+    const data = await get('/management/v1/counters', new URLSearchParams({ per_page: '100', offset: '1' }), beforeSend);
     if (!Array.isArray(data?.counters) || data.counters.length > 100) throw new DirectError('Метрика вернула некорректный список счётчиков.');
-    return data.counters.filter((counter: any) => counter && typeof (counter.site ?? counter.domain) === 'string').map((counter: any) => ({
-      id: id(counter.id), domain: String(counter.site ?? counter.domain).slice(0, 253),
-      name: typeof counter.name === 'string' ? counter.name.slice(0, 200) : undefined,
-    }));
-  },async testGoal(counterId: string, goalId: string, dateFrom: string, dateTo: string, marker: string, beforeSend?: () => void, domain?: string) {
+    return data.counters.flatMap((counter: any) => {
+      const domain = counterDomain(counter);
+      if (typeof domain !== 'string') return [];
+      return [{ id: id(counter.id), domain: domain.slice(0, 253),
+        name: typeof counter.name === 'string' ? counter.name.slice(0, 200) : undefined }];
+    });
+  },async testGoal(counterId: string, goalId: string, dateFrom: string, dateTo: string, marker: string, beforeSend?: () => void, domain?: string): Promise<boolean | 'not_found'> {
     if (!/^[a-f0-9]{32}$/.test(marker) || !domain || !/^[a-z0-9.-]{1,253}$/.test(domain))
       throw new DirectError('Некорректная метка или домен тестового визита.');
     const metrics = ['ym:s:visits', `ym:s:goal${id(goalId)}reaches`, `ym:s:goal${id(goalId)}visits`];
@@ -109,12 +113,17 @@ export function createMetrikaApi(token:()=>Promise<string>,transport:typeof fetc
       throw new DirectError('Метрика вернула отчёт, который не соответствует проверке тестового визита.');
     }
     if (report.sampled !== false || report.sample_share !== 1 || report.total_rows_rounded || report.contains_sensitive_data) return false;
-    return report.data.length === 1 && report.totals.every((value: number) => value === 1)
-      && JSON.stringify(report.data[0]?.metrics) === JSON.stringify(report.totals);
+    const [visits, reaches, goalVisits] = report.totals;
+    if (report.data.length === 0) return visits === 0 && reaches === 0 && goalVisits === 0 ? 'not_found' : false;
+    if (JSON.stringify(report.data[0]?.metrics) !== JSON.stringify(report.totals)) return false;
+    if (reaches === 0 && goalVisits === 0) return 'not_found';
+    return visits === 1 && reaches === 1 && goalVisits === 1;
   },async counter(counterId:string,beforeSend?:()=>void):Promise<MetrikaCounter>{
     const d=(await get(`/management/v1/counter/${id(counterId)}`,new URLSearchParams({field:'goals,mirrors'}),beforeSend)).counter;
-    if(!d||String(d.id)!==counterId||typeof d.site!=='string'&&typeof d.domain!=='string'||!Array.isArray(d.goals))throw new DirectError('Метрика: карточка счётчика неполна.');
-    return {id:counterId,domain:d.site??d.domain,...(typeof d.name==='string'?{name:d.name.slice(0,200)}:{}),mirrors:Array.isArray(d.mirrors)?d.mirrors.filter((v:unknown)=>typeof v==='string'):[],goals:d.goals.filter((g:any)=>!g.is_deleted).map((g:any)=>({id:id(g.id),name:String(g.name).slice(0,200),type:String(g.type),condition:(g.conditions??[]).map((c:any)=>String(c.url??c.type??'')).join(', ').slice(0,500)}))};
+    const domain = counterDomain(d);
+    if(!d||String(d.id)!==counterId||typeof domain!=='string'||!Array.isArray(d.goals))throw new DirectError('Метрика: карточка счётчика неполна.');
+    const mirrors = Array.isArray(d.mirrors2) ? d.mirrors2.map((mirror: { site?: unknown } | null) => mirror?.site) : d.mirrors;
+    return {id:counterId,domain,...(typeof d.name==='string'?{name:d.name.slice(0,200)}:{}),mirrors:Array.isArray(mirrors)?mirrors.filter((v:unknown)=>typeof v==='string'):[],goals:d.goals.filter((g:any)=>!g.is_deleted).map((g:any)=>({id:id(g.id),name:String(g.name).slice(0,200),type:String(g.type),condition:(g.conditions??[]).map((c:any)=>String(c.url??c.type??'')).join(', ').slice(0,500)}))};
   },async report(q:MetrikaQuery,beforeSend?:()=>void){return parseMetrikaReport(await get('/stat/v1/data',metrikaParams(q),beforeSend),q);},
   async daily(q:MetrikaQuery,beforeSend?:()=>void){return parseMetrikaDaily(await get('/stat/v1/data',metrikaDailyParams(q),beforeSend),q);}};
 }

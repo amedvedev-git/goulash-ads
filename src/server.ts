@@ -284,6 +284,7 @@ export function createApp(
           error: connectionError, panel: openConnection, counterInput, counterPreview, advertiserLookup, training: (connection?.mode ?? connections?.view(owner, auth?.binding(request) ?? '', browserToken()).mode) === 'fixture', campaigns: availableCampaigns,
           directConnected: Boolean(connection || directConnection?.owner === owner),
           metrika: { configured: Boolean(provider), enabled: stored.metrikaEnabled, legacy: !measure,
+            disconnected: Boolean(stored.metrikaOAuth && !stored.metrikaOAuth.envelope),
             canList: Boolean(provider?.api.counters), canTest: measure?.canTest,
             current: measure ? measure.current : legacyMetrikaCurrent(stored, provider), counter: measure ? measure.measurement?.counter : stored.counter,
             goalId: measure ? measure.measurement?.goalId : stored.goalId, verified: measure?.verified, verifiedAt: measure?.measurement?.test?.verifiedAt, testUrl: measure?.testUrl },
@@ -540,6 +541,10 @@ export function createApp(
               if (operation === 'choices') {
                 if (Number(revision) !== settings.revision) throw new DirectError('Настройки изменились. Обновите страницу и повторите.');
                 return json(200, { counters: await analytics.listCounters(owner) });
+              } else if (operation === 'list') {
+                if (Number(revision) !== settings.revision) throw new DirectError('Настройки изменились. Обновите страницу и повторите.');
+                metrikaCounters = await analytics.listCounters(owner);
+                return sendPage(200, undefined);
               } else if (operation === 'inspect') {
                 counterPreview = await analytics.inspectCounter(owner, field('counterId'), Number(revision), workspace);
                 if (structured) return json(200, { id: counterPreview.id, domain: counterPreview.domain, name: counterPreview.name,
@@ -558,12 +563,12 @@ export function createApp(
                   directRunId: settings.directRunId ?? '' }), true);
               } else if (!workspace) {
                 throw new DirectError('Сначала выберите сохранённую кампанию.');
-              } else if (operation === 'list') {
-                metrikaCounters = await analytics.listCounters(owner);
-                return sendPage(200, undefined);
               } else if (operation === 'goal') analytics.setGoal(owner, workspace, field('goalId'), Number(revision));
               else if (operation === 'test') analytics.beginTest(owner, workspace, Number(revision));
-              else if (operation === 'verify') await analytics.verifyTest(owner, workspace, Number(revision));
+              else if (operation === 'verify') {
+                const result = await analytics.verifyTest(owner, workspace, Number(revision));
+                if (result === 'not_found') return sendPage(200, undefined, 'Тестовая заявка пока не найдена', undefined, 'neutral');
+              }
               else return response.writeHead(404).end();
             }
           }
