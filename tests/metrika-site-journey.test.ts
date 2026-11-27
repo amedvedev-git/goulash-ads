@@ -17,15 +17,21 @@ test('владелец подключает и переподключает Ме
     Response.json(String(url).startsWith('https://login.yandex.ru/') ? { client_id: 'fixture-login', id: '202' } :
       { access_token: 'fixture-login-token', expires_in: 3600 }) });
   const counter = { id: 101, site2: { site: 'shop.example' }, mirrors2: [{ site: 'mirror.example' }],
-    goals: [{ id: 42, name: 'Заказ', type: 'action' }] };
+    goals: [
+      { id: 42, name: 'Заказ', type: 'action' },
+      { id: 43, name: 'Чат', type: 'chat', conditions: [null] },
+    ] };
   const metrika = createMetrikaConnections(db, {
     clientId: 'fixture-metrika', clientSecret: 'fixture-secret',
     codec: createSecretCodec({ platform: 'linux', key: Buffer.alloc(32, 42) }),
     async transport(url, request) {
       const { origin, pathname, searchParams } = new URL(String(url));
       if (origin === 'https://oauth.yandex.ru') {
-        if ((request?.body as URLSearchParams).get('code') === 'bad-code') return Response.json({ error: 'invalid_grant' }, { status: 400 });
-        return Response.json({ access_token: 'fixture-read', scope: 'metrika:read', expires_in: 3600 });
+        const code = (request?.body as URLSearchParams).get('code');
+        if (code === 'bad-code') return Response.json({ error: 'invalid_grant' }, { status: 400 });
+        const scope = code === 'without-read' ? 'direct:api metrika:read-other'
+          : code === 'without-scope' ? undefined : 'direct:api  metrika:read';
+        return Response.json({ access_token: 'fixture-read', scope, expires_in: 3600 });
       }
       assert.equal(new Headers(request?.headers).get('authorization'), 'OAuth fixture-read');
       if (origin === 'https://login.yandex.ru') return Response.json({ id: '202', client_id: 'fixture-metrika' });
@@ -77,8 +83,9 @@ test('владелец подключает и переподключает Ме
     assert.equal(approval.searchParams.get('scope'), 'metrika:read');
     return approval.searchParams.get('state')!;
   }
-  async function connectAndSelect() {
-    assert.equal((await action('finish', { code: 'fixture-approval', state: await startConnection() })).status, 303);
+  async function connectAndSelect(code = 'fixture-approval') {
+    const finish = await action('finish', { code, state: await startConnection() });
+    assert.equal(finish.status, 303, 'явный список прав с metrika:read или отсутствующий scope допускают подключение');
     assert.match(await get(panel), /Доступ получен[\s\S]*Выберите счётчик и цель для отчётов/);
     assert.match(await get(panel), /<form[^>]+action="\/connections\/metrika\/list"[\s\S]*?Показать счётчики/);
     const serverOptions = await action('list');
@@ -94,7 +101,7 @@ test('владелец подключает и переподключает Ме
     assert.equal(choices.status, 200, 'список счётчиков должен загружаться после подключения');
     assert.deepEqual((await choices.json()).counters, [{ id: '101', domain: 'shop.example' }]);
     const inspected = await (await action('inspect', { counterId: '101' }, true)).json();
-    assert.deepEqual(inspected.goals, [{ id: '42', name: 'Заказ' }]);
+    assert.deepEqual(inspected.goals, [{ id: '42', name: 'Заказ' }, { id: '43', name: 'Чат' }]);
     assert.equal((await action('configure', { counterId: '101', goalId: '42', enable: 'read' })).status, 303);
     const settings = db.readAnalyticsSettings('yandex:202');
     assert.equal(settings.goalId, '42');
@@ -106,6 +113,11 @@ test('владелец подключает и переподключает Ме
   const errorDialog = (await failed.text()).match(/<dialog[^>]+id="connection-metrika"[\s\S]+?<\/dialog>/)?.[0] ?? '';
   assert.match(errorDialog, /role="alert"[^>]*><p>Код Метрики неверен, просрочен или уже использован/);
   await connectAndSelect();
+  const connected = db.readAnalyticsSettings('yandex:202');
+  const missingRead = await action('finish', { code: 'without-read', state: await startConnection() });
+  assert.equal(missingRead.status, 409);
+  assert.match(await missingRead.text(), /Яндекс не выдал право на чтение Метрики/);
+  assert.deepEqual(db.readAnalyticsSettings('yandex:202'), connected);
   const before = await get('/results');
   assert.match(before, /name="source" value="metrika_site"/);
   assert.doesNotMatch(before, /name="source" value="(?:direct_reports|metrika_direct)"/);
@@ -122,7 +134,7 @@ test('владелец подключает и переподключает Ме
   assert.match(result, /Достижения цели 3 · Целевые визиты 2/);
   assert.match(result, /shop\.example · цель «Заказ»/);
 
-  await connectAndSelect();
+  await connectAndSelect('without-scope');
   const proof = (await get(panel)).match(/name="disconnectProof" value="([\w-]+)"/);
   assert.ok(proof, 'в личном подключении доступно отключение');
   assert.equal((await action('disconnect', { confirm: 'disconnect', disconnectProof: proof[1] })).status, 303);

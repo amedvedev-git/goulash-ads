@@ -123,7 +123,13 @@ export function createMetrikaApi(token:()=>Promise<string>,transport:typeof fetc
     const domain = counterDomain(d);
     if(!d||String(d.id)!==counterId||typeof domain!=='string'||!Array.isArray(d.goals))throw new DirectError('Метрика: карточка счётчика неполна.');
     const mirrors = Array.isArray(d.mirrors2) ? d.mirrors2.map((mirror: { site?: unknown } | null) => mirror?.site) : d.mirrors;
-    return {id:counterId,domain,...(typeof d.name==='string'?{name:d.name.slice(0,200)}:{}),mirrors:Array.isArray(mirrors)?mirrors.filter((v:unknown)=>typeof v==='string'):[],goals:d.goals.filter((g:any)=>!g.is_deleted).map((g:any)=>({id:id(g.id),name:String(g.name).slice(0,200),type:String(g.type),condition:(g.conditions??[]).map((c:any)=>String(c.url??c.type??'')).join(', ').slice(0,500)}))};
+    const goals = d.goals.filter((goal: any) => goal && !goal.is_deleted).map((goal: any) => {
+      const conditions = Array.isArray(goal.conditions) ? goal.conditions : [];
+      const condition = conditions.map(item => String(item?.url ?? item?.type ?? '')).filter(Boolean).join(', ').slice(0, 500);
+      return { id: id(goal.id), name: String(goal.name).slice(0, 200), type: String(goal.type), condition };
+    });
+    return { id: counterId, domain, ...(typeof d.name === 'string' ? { name: d.name.slice(0, 200) } : {}),
+      mirrors: Array.isArray(mirrors) ? mirrors.filter((value: unknown) => typeof value === 'string') : [], goals };
   },async report(q:MetrikaQuery,beforeSend?:()=>void){return parseMetrikaReport(await get('/stat/v1/data',metrikaParams(q),beforeSend),q);},
   async daily(q:MetrikaQuery,beforeSend?:()=>void){return parseMetrikaDaily(await get('/stat/v1/data',metrikaDailyParams(q),beforeSend),q);}};
 }

@@ -98,7 +98,7 @@ export function renderConnectionSettings(view: ConnectionSettings, metrikaNotice
       <div class="connection-field-grid">${counterSelect}${goalSelect}</div>
       <p class="connection-feedback" role="status" data-measurement-feedback>${metrika.enabled ? '<span hidden data-metrika-enhanced>Настройки сохраняются автоматически.</span>' : ''}</p>
       <div class="connection-links" data-metrika-native><button class="secondary" type="submit" formaction="${action('inspect')}" formnovalidate>Загрузить цели</button>
-      ${metrika.enabled ? '<button class="primary" type="submit">Сохранить настройки</button>' : ''}</div>
+      ${metrika.enabled ? '<button class="primary" type="submit" data-retry-metrika-save>Сохранить настройки</button>' : ''}</div>
       ${metrika.enabled ? ''
     : '<button class="primary" type="submit" name="enable" value="read" data-enable-metrika>Включить чтение</button>'}</form>
     <details class="connection-manual"><summary>Указать номер счётчика</summary>

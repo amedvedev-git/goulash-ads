@@ -90,8 +90,8 @@ export function createMetrikaConnections(db: ReturnType<typeof openDatabase>, co
       if (typeof token?.access_token !== 'string' || !/^[\x21-\x7e]{1,16000}$/.test(token.access_token)
         || !Number.isSafeInteger(token.expires_in) || token.expires_in <= 0 || token.expires_in > 10 * 366 * 86400)
         throw new DirectError('Яндекс вернул некорректные данные для доступа к Метрике. Обратитесь к администратору.');
-      if (token.scope !== undefined && token.scope !== scope)
-        throw new DirectError('Яндекс выдал неожиданный набор прав для Метрики. Обратитесь к администратору.');
+      if (token.scope !== undefined && (typeof token.scope !== 'string' || !token.scope.split(/\s+/).includes(scope)))
+        throw new DirectError('Яндекс не выдал право на чтение Метрики. Обратитесь к администратору.');
       const expiresAt = Date.now() + token.expires_in * 1000;
       const identity = await transport('https://login.yandex.ru/info?format=json', {
         headers: { Authorization: `OAuth ${token.access_token}` }, redirect: 'error', signal: AbortSignal.timeout(10_000),

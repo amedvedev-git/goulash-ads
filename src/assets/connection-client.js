@@ -187,6 +187,8 @@
 
   function showChoices(form) {
     for (const counter of choices ?? []) updateCounterOption(form.elements.counterId, counter.id, `${counter.name || counter.domain} · ${counter.id}`);
+    if (choices?.length === 0 && !form.elements.counterId.value && !inspection && !saving)
+      announce(form, 'У этого аккаунта нет доступных счётчиков. Проверьте права в Яндекс Метрике или укажите номер счётчика.');
   }
 
   async function loadChoices() {
@@ -261,7 +263,10 @@
         goalId.focus();
       }
     } catch (error) {
-      if (!request.signal.aborted) announce(form, error.message, true);
+      if (!request.signal.aborted && form === pair()) {
+        counterId.value = '';
+        announce(form, error.message, true);
+      }
     } finally {
       if (inspection === request) { inspection = undefined; goalId.disabled = false; }
     }
@@ -331,8 +336,14 @@
       announce(fresh, fields.has('enable') ? 'Чтение отчётов включено.' : 'Настройки сохранены.');
       if (openKey() === 'metrika') (document.getElementById(focusId) ?? fresh.elements.goalId).focus({ preventScroll: true });
     } catch (error) {
-      if (openKey() === 'metrika') announce(form, error.message, true);
-      else restorePair();
+      if (openKey() === 'metrika' && form === pair()) {
+        announce(form, error.message, true);
+        const retry = form.querySelector('[data-retry-metrika-save]');
+        if (retry) {
+          retry.parentElement.querySelector('[formaction]').hidden = true;
+          retry.parentElement.hidden = false;
+        }
+      } else restorePair();
     }
     finally {
       saving = false;
